@@ -1,115 +1,68 @@
-
--- TeleportIslands GUI Script (Mobile & PC Support)
+-- TeleportIslands GUI Script
 -- Đặt script này vào StarterGui hoặc StarterPlayerScripts
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- Kiểm tra thiết bị
-local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local isTablet = UserInputService.TouchEnabled and UserInputService.KeyboardEnabled
-
 -- Danh sách các đảo
 local islands = {
-    {name = "Peanut Island", position = Vector3.new(-2158.17, 38.36, -10193.24), emoji = "🥜"},
-    {name = "Icecream Island", position = Vector3.new(-863.93, 66.08, -11019.04), emoji = "🍦"},
-    {name = "Tiki", position = Vector3.new(-16228.08, 9.32, 412.53), emoji = "🗿"},
-    {name = "Haunted Castle", position = Vector3.new(-9506.11, 142.36, 5526.04), emoji = "👻"},
-    {name = "CakeLoaf", position = Vector3.new(-2145.42, 38.06, -11895.08), emoji = "🍰"},
-    {name = "Castle On The Sea", position = Vector3.new(-4999.45, 314.78, -3010.54), emoji = "🏰"}
+    {name = "Peanut Island", position = Vector3.new(-2158.17, 38.36, -10193.24)},
+    {name = "Icecream Island", position = Vector3.new(-863.93, 66.08, -11019.04)},
+    {name = "Tiki", position = Vector3.new(-16228.08, 9.32, 412.53)},
+    {name = "Haunted Castle", position = Vector3.new(-9506.11, 142.36, 5526.04)},
+    {name = "CakeLoaf", position = Vector3.new(-2145.42, 38.06, -11895.08)},
+    {name = "Castle On The Sea", position = Vector3.new(-4999.45, 314.78, -3010.54)}
 }
 
 -- Tạo GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "IslandTeleportGUI"
 screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame chính với kích thước responsive
+-- Frame chính
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-if isMobile then
-    mainFrame.Size = UDim2.new(0.9, 0, 0.7, 0) -- 90% chiều rộng, 70% chiều cao
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-else
-    mainFrame.Size = UDim2.new(0, 320, 0, 450)
-    mainFrame.Position = UDim2.new(0.5, -160, 0.5, -225)
-end
+mainFrame.Size = UDim2.new(0, 300, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 
 -- Bo góc cho frame
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.CornerRadius = UDim.new(0, 10)
 mainCorner.Parent = mainFrame
-
--- Stroke (viền) cho frame
-local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(70, 70, 90)
-mainStroke.Thickness = 2
-mainStroke.Parent = mainFrame
 
 -- Title
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "Title"
-titleLabel.Size = UDim2.new(1, 0, 0, isMobile and 60 or 50)
+titleLabel.Size = UDim2.new(1, 0, 0, 50)
 titleLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 titleLabel.BorderSizePixel = 0
 titleLabel.Text = "🏝️ Island Teleporter"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = isMobile and 22 or 20
+titleLabel.TextSize = 20
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.CornerRadius = UDim.new(0, 10)
 titleCorner.Parent = titleLabel
-
--- Toggle Button (để ẩn/hiện GUI trên mobile)
-local toggleButton = Instance.new("TextButton")
-toggleButton.Name = "ToggleButton"
-if isMobile then
-    toggleButton.Size = UDim2.new(0, 60, 0, 60)
-    toggleButton.Position = UDim2.new(1, -70, 0, 10)
-else
-    toggleButton.Size = UDim2.new(0, 50, 0, 50)
-    toggleButton.Position = UDim2.new(0, 10, 0, 10)
-end
-toggleButton.AnchorPoint = Vector2.new(0, 0)
-toggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 250)
-toggleButton.BorderSizePixel = 0
-toggleButton.Text = "🏝️"
-toggleButton.TextSize = isMobile and 30 or 25
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.ZIndex = 10
-toggleButton.Parent = screenGui
-
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(1, 0)
-toggleCorner.Parent = toggleButton
-
-local toggleStroke = Instance.new("UIStroke")
-toggleStroke.Color = Color3.fromRGB(255, 255, 255)
-toggleStroke.Thickness = 2
-toggleStroke.Parent = toggleButton
 
 -- Close Button
 local closeButton = Instance.new("TextButton")
 closeButton.Name = "CloseButton"
-closeButton.Size = UDim2.new(0, isMobile and 50 or 40, 0, isMobile and 50 or 40)
-closeButton.Position = UDim2.new(1, isMobile and -55 or -45, 0, isMobile and 5 or 5)
-closeButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+closeButton.Size = UDim2.new(0, 40, 0, 40)
+closeButton.Position = UDim2.new(1, -45, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.BorderSizePixel = 0
-closeButton.Text = "✕"
+closeButton.Text = "X"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextSize = isMobile and 24 or 20
+closeButton.TextSize = 18
 closeButton.Font = Enum.Font.GothamBold
 closeButton.Parent = mainFrame
 
@@ -120,16 +73,15 @@ closeCorner.Parent = closeButton
 -- ScrollingFrame cho danh sách đảo
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Name = "IslandList"
-scrollFrame.Size = UDim2.new(1, isMobile and -30 or -20, 1, isMobile and -80 or -70)
-scrollFrame.Position = UDim2.new(0, isMobile and 15 or 10, 0, isMobile and 70 or 60)
+scrollFrame.Size = UDim2.new(1, -20, 1, -70)
+scrollFrame.Position = UDim2.new(0, 10, 0, 60)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = isMobile and 8 : 6
-scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
+scrollFrame.ScrollBarThickness = 6
 scrollFrame.Parent = mainFrame
 
 local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0, isMobile and 12 or 8)
+listLayout.Padding = UDim.new(0, 8)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = scrollFrame
 
@@ -191,148 +143,88 @@ end
 for i, island in ipairs(islands) do
     local islandButton = Instance.new("TextButton")
     islandButton.Name = island.name
-    islandButton.Size = UDim2.new(1, isMobile and -15 or -10, 0, isMobile and 60 : 50)
+    islandButton.Size = UDim2.new(1, -10, 0, 45)
     islandButton.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
     islandButton.BorderSizePixel = 0
-    islandButton.AutoButtonColor = false
-    islandButton.Text = ""
+    islandButton.Text = island.name
+    islandButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    islandButton.TextSize = 16
+    islandButton.Font = Enum.Font.Gotham
     islandButton.Parent = scrollFrame
     
     local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 10)
+    buttonCorner.CornerRadius = UDim.new(0, 8)
     buttonCorner.Parent = islandButton
     
-    local buttonStroke = Instance.new("UIStroke")
-    buttonStroke.Color = Color3.fromRGB(70, 70, 90)
-    buttonStroke.Thickness = 1
-    buttonStroke.Transparency = 0.5
-    buttonStroke.Parent = islandButton
+    -- Hiệu ứng hover
+    islandButton.MouseEnter:Connect(function()
+        if not isTweening then
+            islandButton.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+        end
+    end)
     
-    -- Icon emoji
-    local emojiLabel = Instance.new("TextLabel")
-    emojiLabel.Size = UDim2.new(0, isMobile and 50 or 40, 1, 0)
-    emojiLabel.Position = UDim2.new(0, 5, 0, 0)
-    emojiLabel.BackgroundTransparency = 1
-    emojiLabel.Text = island.emoji
-    emojiLabel.TextSize = isMobile and 28 or 24
-    emojiLabel.Parent = islandButton
-    
-    -- Tên đảo
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, isMobile and -65 or -55, 1, 0)
-    nameLabel.Position = UDim2.new(0, isMobile and 60 or 50, 0, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = island.name
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.TextSize = isMobile and 18 or 16
-    nameLabel.Font = Enum.Font.GothamSemibold
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    nameLabel.Parent = islandButton
-    
-    -- Hiệu ứng hover (chỉ cho PC)
-    if not isMobile then
-        islandButton.MouseEnter:Connect(function()
-            if not isTweening then
-                TweenService:Create(islandButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 90)}):Play()
-                TweenService:Create(buttonStroke, TweenInfo.new(0.2), {Thickness = 2, Transparency = 0}):Play()
-            end
-        end)
-        
-        islandButton.MouseLeave:Connect(function()
-            TweenService:Create(islandButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 65)}):Play()
-            TweenService:Create(buttonStroke, TweenInfo.new(0.2), {Thickness = 1, Transparency = 0.5}):Play()
-        end)
-    end
+    islandButton.MouseLeave:Connect(function()
+        islandButton.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+    end)
     
     -- Xử lý click
     islandButton.MouseButton1Click:Connect(function()
         if not isTweening then
-            -- Hiệu ứng click
-            TweenService:Create(islandButton, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(80, 180, 80)}):Play()
+            islandButton.BackgroundColor3 = Color3.fromRGB(80, 150, 80)
             teleportToIsland(island.position)
-            wait(0.3)
-            TweenService:Create(islandButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 65)}):Play()
+            wait(0.2)
+            islandButton.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
         end
     end)
 end
 
 -- Cập nhật canvas size
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + (isMobile and 20 or 10))
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
 listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + (isMobile and 20 or 10))
-end)
-
--- Xử lý toggle button
-local isGuiVisible = true
-toggleButton.MouseButton1Click:Connect(function()
-    isGuiVisible = not isGuiVisible
-    mainFrame.Visible = isGuiVisible
-    
-    -- Hiệu ứng cho toggle button
-    local targetColor = isGuiVisible and Color3.fromRGB(50, 150, 250) or Color3.fromRGB(100, 100, 120)
-    TweenService:Create(toggleButton, TweenInfo.new(0.3), {BackgroundColor3 = targetColor}):Play()
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
 end)
 
 -- Xử lý nút đóng
 closeButton.MouseButton1Click:Connect(function()
-    isGuiVisible = false
-    mainFrame.Visible = false
-    TweenService:Create(toggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(100, 100, 120)}):Play()
+    mainFrame.Visible = not mainFrame.Visible
 end)
 
--- Làm frame có thể kéo (chỉ cho PC/Tablet)
-if not isMobile or isTablet then
-    local dragging
-    local dragInput
-    local dragStart
-    local startPos
+-- Làm frame có thể kéo
+local dragging
+local dragInput
+local dragStart
+local startPos
 
-    local function update(input)
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-
-    titleLabel.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = mainFrame.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-
-    titleLabel.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            update(input)
-        end
-    end)
+local function update(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
--- Hiệu ứng xuất hiện
-mainFrame.Size = UDim2.new(0, 0, 0, 0)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+titleLabel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
 
-wait(0.1)
+titleLabel.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
 
-local targetSize = isMobile and UDim2.new(0.9, 0, 0.7, 0) or UDim2.new(0, 320, 0, 450)
-local targetPos = UDim2.new(0.5, 0, 0.5, 0)
-
-TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Size = targetSize,
-    Position = targetPos
-}):Play()
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
 
 -- Xử lý khi character respawn
 player.CharacterAdded:Connect(function(newCharacter)
@@ -345,4 +237,4 @@ player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
-print("Island Teleporter GUI đã load thành công! (Mobile & PC Support)")
+print("Island Teleporter GUI đã load thành công!")
