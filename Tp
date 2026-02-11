@@ -1,352 +1,348 @@
 
--- LocalScript đặt trong StarterGui hoặc StarterPlayerScripts
+-- TeleportIslands GUI Script (Mobile & PC Support)
+-- Đặt script này vào StarterGui hoặc StarterPlayerScripts
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
+-- Kiểm tra thiết bị
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local isTablet = UserInputService.TouchEnabled and UserInputService.KeyboardEnabled
+
 -- Danh sách các đảo
 local islands = {
-    {name = "Peanut Island", position = Vector3.new(-2158.17, 38.36, -10193.24)},
-    {name = "Icecream Island", position = Vector3.new(-863.93, 66.08, -11019.04)},
-    {name = "Tiki", position = Vector3.new(-16228.08, 9.32, 412.53)},
-    {name = "Haunted Castle", position = Vector3.new(-9506.11, 142.36, 5526.04)},
-    {name = "CakeLoaf", position = Vector3.new(-2145.42, 38.06, -11895.08)},
-    {name = "Castle On The Sea", position = Vector3.new(-4999.45, 314.78, -3010.54)}
+    {name = "Peanut Island", position = Vector3.new(-2158.17, 38.36, -10193.24), emoji = "🥜"},
+    {name = "Icecream Island", position = Vector3.new(-863.93, 66.08, -11019.04), emoji = "🍦"},
+    {name = "Tiki", position = Vector3.new(-16228.08, 9.32, 412.53), emoji = "🗿"},
+    {name = "Haunted Castle", position = Vector3.new(-9506.11, 142.36, 5526.04), emoji = "👻"},
+    {name = "CakeLoaf", position = Vector3.new(-2145.42, 38.06, -11895.08), emoji = "🍰"},
+    {name = "Castle On The Sea", position = Vector3.new(-4999.45, 314.78, -3010.54), emoji = "🏰"}
 }
 
-local tweenSpeed = 350
-local isTweening = false
-local flyHeight = 300 -- Độ cao bay (studs)
-
--- Tạo ScreenGui
+-- Tạo GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "IslandTeleportGui"
+screenGui.Name = "IslandTeleportGUI"
 screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Tạo Frame chính
+-- Frame chính với kích thước responsive
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 300, 0, 450)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -225)
-mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+if isMobile then
+    mainFrame.Size = UDim2.new(0.9, 0, 0.7, 0) -- 90% chiều rộng, 70% chiều cao
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+else
+    mainFrame.Size = UDim2.new(0, 320, 0, 450)
+    mainFrame.Position = UDim2.new(0.5, -160, 0.5, -225)
+end
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 
 -- Bo góc cho frame
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
 
--- Tạo tiêu đề
+-- Stroke (viền) cho frame
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(70, 70, 90)
+mainStroke.Thickness = 2
+mainStroke.Parent = mainFrame
+
+-- Title
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "Title"
-titleLabel.Size = UDim2.new(1, 0, 0, 50)
-titleLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleLabel.Size = UDim2.new(1, 0, 0, isMobile and 60 or 50)
+titleLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 titleLabel.BorderSizePixel = 0
-titleLabel.Text = "🏝️ Island Teleport"
+titleLabel.Text = "🏝️ Island Teleporter"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = isMobile and 22 or 20
 titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 20
 titleLabel.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.CornerRadius = UDim.new(0, 12)
 titleCorner.Parent = titleLabel
 
--- Tạo ScrollingFrame cho danh sách đảo
+-- Toggle Button (để ẩn/hiện GUI trên mobile)
+local toggleButton = Instance.new("TextButton")
+toggleButton.Name = "ToggleButton"
+if isMobile then
+    toggleButton.Size = UDim2.new(0, 60, 0, 60)
+    toggleButton.Position = UDim2.new(1, -70, 0, 10)
+else
+    toggleButton.Size = UDim2.new(0, 50, 0, 50)
+    toggleButton.Position = UDim2.new(0, 10, 0, 10)
+end
+toggleButton.AnchorPoint = Vector2.new(0, 0)
+toggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 250)
+toggleButton.BorderSizePixel = 0
+toggleButton.Text = "🏝️"
+toggleButton.TextSize = isMobile and 30 or 25
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.ZIndex = 10
+toggleButton.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleButton
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(255, 255, 255)
+toggleStroke.Thickness = 2
+toggleStroke.Parent = toggleButton
+
+-- Close Button
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, isMobile and 50 or 40, 0, isMobile and 50 or 40)
+closeButton.Position = UDim2.new(1, isMobile and -55 or -45, 0, isMobile and 5 or 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+closeButton.BorderSizePixel = 0
+closeButton.Text = "✕"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextSize = isMobile and 24 or 20
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Parent = mainFrame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeButton
+
+-- ScrollingFrame cho danh sách đảo
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Name = "IslandList"
-scrollFrame.Size = UDim2.new(1, -20, 1, -110)
-scrollFrame.Position = UDim2.new(0, 10, 0, 60)
+scrollFrame.Size = UDim2.new(1, isMobile and -30 or -20, 1, isMobile and -80 or -70)
+scrollFrame.Position = UDim2.new(0, isMobile and 15 or 10, 0, isMobile and 70 or 60)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = 6
+scrollFrame.ScrollBarThickness = isMobile and 8 : 6
+scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
 scrollFrame.Parent = mainFrame
 
--- Layout cho các button
 local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0, 8)
+listLayout.Padding = UDim.new(0, isMobile and 12 or 8)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = scrollFrame
 
--- Hàm tween mượt với đường bay cong
-local function tweenToIsland(targetPosition)
+-- Biến để kiểm soát tween
+local currentTween = nil
+local isTweening = false
+
+-- Hàm tween mượt mà đến đảo
+local function teleportToIsland(targetPosition)
     if isTweening then
-        isTweening = false
-        wait(0.1)
+        warn("Đang di chuyển, vui lòng đợi!")
+        return
     end
+    
+    -- Cập nhật character và HumanoidRootPart
+    character = player.Character
+    if not character then return end
+    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
     
     isTweening = true
     
-    -- Lấy character và HumanoidRootPart mới nhất
-    character = player.Character
-    if not character then 
+    -- Tính khoảng cách để xác định thời gian tween
+    local distance = (targetPosition - humanoidRootPart.Position).Magnitude
+    local tweenSpeed = 350 -- Tốc độ studs/giây
+    local tweenTime = distance / tweenSpeed
+    
+    -- Tạo TweenInfo với easing mượt mà
+    local tweenInfo = TweenInfo.new(
+        tweenTime,
+        Enum.EasingStyle.Linear, -- Linear để tốc độ đều
+        Enum.EasingDirection.Out,
+        0,
+        false,
+        0
+    )
+    
+    -- Tạo tween cho CFrame (không bị giật do xyz khác nhau)
+    local goal = {CFrame = CFrame.new(targetPosition)}
+    
+    -- Hủy tween cũ nếu có
+    if currentTween then
+        currentTween:Cancel()
+    end
+    
+    currentTween = TweenService:Create(humanoidRootPart, tweenInfo, goal)
+    
+    -- Xử lý khi tween hoàn thành
+    currentTween.Completed:Connect(function(playbackState)
         isTweening = false
-        return 
-    end
-    
-    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChild("Humanoid")
-    
-    if not humanoidRootPart or not humanoid then 
-        isTweening = false
-        return 
-    end
-    
-    -- Tắt gravity và collision để tránh giật
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    bodyVelocity.Parent = humanoidRootPart
-    
-    local bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bodyGyro.P = 10000
-    bodyGyro.D = 500
-    bodyGyro.CFrame = humanoidRootPart.CFrame
-    bodyGyro.Parent = humanoidRootPart
-    
-    -- Vô hiệu hóa collision
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-        end
-    end
-    
-    -- Tính toán 3 điểm: Start -> Peak (cao) -> End
-    local startPos = humanoidRootPart.Position
-    local endPos = targetPosition
-    
-    -- Tính điểm cao nhất (peak) ở giữa hành trình
-    local midPoint = (startPos + endPos) / 2
-    local peakPos = Vector3.new(midPoint.X, math.max(startPos.Y, endPos.Y) + flyHeight, midPoint.Z)
-    
-    -- Tính tổng quãng đường (bay theo đường cong)
-    local dist1 = (peakPos - startPos).Magnitude
-    local dist2 = (endPos - peakPos).Magnitude
-    local totalDistance = dist1 + dist2
-    local duration = totalDistance / tweenSpeed
-    
-    print("Đang bay đến đảo... (" .. math.floor(totalDistance) .. " studs, " .. math.floor(duration) .. "s)")
-    
-    -- Tween mượt bằng RunService với đường cong Bezier
-    local RunService = game:GetService("RunService")
-    local startTime = tick()
-    local connection
-    
-    connection = RunService.Heartbeat:Connect(function()
-        if not isTweening then
-            connection:Disconnect()
-            bodyVelocity:Destroy()
-            bodyGyro:Destroy()
-            -- Khôi phục collision
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                    part.CanCollide = true
-                end
-            end
-            return
-        end
-        
-        local elapsed = tick() - startTime
-        local alpha = math.min(elapsed / duration, 1)
-        
-        -- Easing function (Sine InOut cho mượt hơn)
-        local easedAlpha = alpha < 0.5 
-            and 2 * alpha * alpha 
-            or 1 - math.pow(-2 * alpha + 2, 2) / 2
-        
-        -- Tính vị trí theo đường cong Quadratic Bezier (3 điểm)
-        -- B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
-        local t = easedAlpha
-        local oneMinusT = 1 - t
-        
-        local currentPos = 
-            oneMinusT * oneMinusT * startPos +
-            2 * oneMinusT * t * peakPos +
-            t * t * endPos
-        
-        -- Tính hướng nhìn (lookAt next point)
-        local nextT = math.min(t + 0.01, 1)
-        local nextOneMinusT = 1 - nextT
-        local nextPos = 
-            nextOneMinusT * nextOneMinusT * startPos +
-            2 * nextOneMinusT * nextT * peakPos +
-            nextT * nextT * endPos
-        
-        -- Di chuyển mượt
-        local lookAtCFrame = CFrame.new(currentPos, nextPos)
-        humanoidRootPart.CFrame = lookAtCFrame
-        bodyGyro.CFrame = lookAtCFrame
-        
-        -- Kết thúc
-        if alpha >= 1 then
-            connection:Disconnect()
-            humanoidRootPart.CFrame = CFrame.new(endPos)
-            bodyVelocity:Destroy()
-            bodyGyro:Destroy()
-            
-            -- Khôi phục collision
-            task.wait(0.1)
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                    part.CanCollide = true
-                end
-            end
-            
-            isTweening = false
-            print("Đã đến đảo!")
-        end
+        currentTween = nil
+        print("Đã đến đảo!")
     end)
+    
+    currentTween:Play()
 end
 
 -- Tạo button cho mỗi đảo
 for i, island in ipairs(islands) do
-    local button = Instance.new("TextButton")
-    button.Name = island.name
-    button.Size = UDim2.new(1, -10, 0, 45)
-    button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    button.BorderSizePixel = 0
-    button.Text = island.name
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Font = Enum.Font.Gotham
-    button.TextSize = 16
-    button.AutoButtonColor = false
-    button.Parent = scrollFrame
+    local islandButton = Instance.new("TextButton")
+    islandButton.Name = island.name
+    islandButton.Size = UDim2.new(1, isMobile and -15 or -10, 0, isMobile and 60 : 50)
+    islandButton.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+    islandButton.BorderSizePixel = 0
+    islandButton.AutoButtonColor = false
+    islandButton.Text = ""
+    islandButton.Parent = scrollFrame
     
     local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 8)
-    buttonCorner.Parent = button
+    buttonCorner.CornerRadius = UDim.new(0, 10)
+    buttonCorner.Parent = islandButton
     
-    -- Hiệu ứng hover
-    button.MouseEnter:Connect(function()
-        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    end)
+    local buttonStroke = Instance.new("UIStroke")
+    buttonStroke.Color = Color3.fromRGB(70, 70, 90)
+    buttonStroke.Thickness = 1
+    buttonStroke.Transparency = 0.5
+    buttonStroke.Parent = islandButton
     
-    button.MouseLeave:Connect(function()
-        button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    end)
+    -- Icon emoji
+    local emojiLabel = Instance.new("TextLabel")
+    emojiLabel.Size = UDim2.new(0, isMobile and 50 or 40, 1, 0)
+    emojiLabel.Position = UDim2.new(0, 5, 0, 0)
+    emojiLabel.BackgroundTransparency = 1
+    emojiLabel.Text = island.emoji
+    emojiLabel.TextSize = isMobile and 28 or 24
+    emojiLabel.Parent = islandButton
     
-    -- Click để tween
-    button.MouseButton1Click:Connect(function()
-        tweenToIsland(island.position)
-        button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-        wait(0.2)
-        button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    -- Tên đảo
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, isMobile and -65 or -55, 1, 0)
+    nameLabel.Position = UDim2.new(0, isMobile and 60 or 50, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = island.name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextSize = isMobile and 18 or 16
+    nameLabel.Font = Enum.Font.GothamSemibold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = islandButton
+    
+    -- Hiệu ứng hover (chỉ cho PC)
+    if not isMobile then
+        islandButton.MouseEnter:Connect(function()
+            if not isTweening then
+                TweenService:Create(islandButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 90)}):Play()
+                TweenService:Create(buttonStroke, TweenInfo.new(0.2), {Thickness = 2, Transparency = 0}):Play()
+            end
+        end)
+        
+        islandButton.MouseLeave:Connect(function()
+            TweenService:Create(islandButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 65)}):Play()
+            TweenService:Create(buttonStroke, TweenInfo.new(0.2), {Thickness = 1, Transparency = 0.5}):Play()
+        end)
+    end
+    
+    -- Xử lý click
+    islandButton.MouseButton1Click:Connect(function()
+        if not isTweening then
+            -- Hiệu ứng click
+            TweenService:Create(islandButton, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(80, 180, 80)}):Play()
+            teleportToIsland(island.position)
+            wait(0.3)
+            TweenService:Create(islandButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 65)}):Play()
+        end
     end)
 end
 
 -- Cập nhật canvas size
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + (isMobile and 20 or 10))
 listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + (isMobile and 20 or 10))
 end)
 
--- Tạo nút đóng
-local closeButton = Instance.new("TextButton")
-closeButton.Name = "CloseButton"
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -35, 0, 10)
-closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-closeButton.BorderSizePixel = 0
-closeButton.Text = "✕"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.Font = Enum.Font.GothamBold
-closeButton.TextSize = 18
-closeButton.Parent = mainFrame
+-- Xử lý toggle button
+local isGuiVisible = true
+toggleButton.MouseButton1Click:Connect(function()
+    isGuiVisible = not isGuiVisible
+    mainFrame.Visible = isGuiVisible
+    
+    -- Hiệu ứng cho toggle button
+    local targetColor = isGuiVisible and Color3.fromRGB(50, 150, 250) or Color3.fromRGB(100, 100, 120)
+    TweenService:Create(toggleButton, TweenInfo.new(0.3), {BackgroundColor3 = targetColor}):Play()
+end)
 
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(1, 0)
-closeCorner.Parent = closeButton
-
+-- Xử lý nút đóng
 closeButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
+    isGuiVisible = false
+    mainFrame.Visible = false
+    TweenService:Create(toggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(100, 100, 120)}):Play()
 end)
 
--- Nút Stop
-local stopButton = Instance.new("TextButton")
-stopButton.Name = "StopButton"
-stopButton.Size = UDim2.new(0.48, 0, 0, 35)
-stopButton.Position = UDim2.new(0, 10, 1, -45)
-stopButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-stopButton.BorderSizePixel = 0
-stopButton.Text = "⏹ STOP"
-stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopButton.Font = Enum.Font.GothamBold
-stopButton.TextSize = 14
-stopButton.Parent = mainFrame
+-- Làm frame có thể kéo (chỉ cho PC/Tablet)
+if not isMobile or isTablet then
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
 
-local stopCorner = Instance.new("UICorner")
-stopCorner.CornerRadius = UDim.new(0, 8)
-stopCorner.Parent = stopButton
-
-stopButton.MouseButton1Click:Connect(function()
-    isTweening = false
-    print("Đã dừng tween!")
-end)
-
--- Label hiển thị độ cao bay
-local heightLabel = Instance.new("TextLabel")
-heightLabel.Name = "HeightLabel"
-heightLabel.Size = UDim2.new(0.48, 0, 0, 35)
-heightLabel.Position = UDim2.new(0.52, 0, 1, -45)
-heightLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-heightLabel.BorderSizePixel = 0
-heightLabel.Text = "High: " .. flyHeight
-heightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-heightLabel.Font = Enum.Font.Gotham
-heightLabel.TextSize = 14
-heightLabel.Parent = mainFrame
-
-local heightCorner = Instance.new("UICorner")
-heightCorner.CornerRadius = UDim.new(0, 8)
-heightCorner.Parent = heightLabel
-
--- Kéo thả GUI
-local dragging = false
-local dragInput, mousePos, framePos
-
-titleLabel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        mousePos = input.Position
-        framePos = mainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+    local function update(input)
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
-end)
 
-titleLabel.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
-    end
-end)
+    titleLabel.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - mousePos
-        mainFrame.Position = UDim2.new(
-            framePos.X.Scale,
-            framePos.X.Offset + delta.X,
-            framePos.Y.Scale,
-            framePos.Y.Offset + delta.Y
-        )
-    end
-end)
+    titleLabel.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
 
--- Cập nhật character khi respawn
-player.CharacterAdded:Connect(function(char)
-    character = char
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
+-- Hiệu ứng xuất hiện
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+wait(0.1)
+
+local targetSize = isMobile and UDim2.new(0.9, 0, 0.7, 0) or UDim2.new(0, 320, 0, 450)
+local targetPos = UDim2.new(0.5, 0, 0.5, 0)
+
+TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = targetSize,
+    Position = targetPos
+}):Play()
+
+-- Xử lý khi character respawn
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
     humanoidRootPart = character:WaitForChild("HumanoidRootPart")
     isTweening = false
+    if currentTween then
+        currentTween:Cancel()
+        currentTween = nil
+    end
 end)
 
-print("Island Teleport GUI đã được tải! (Smooth Curve Flight)")
+print("Island Teleporter GUI đã load thành công! (Mobile & PC Support)")
