@@ -350,4 +350,3 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 print("Island Teleport GUI đã được tải! (Smooth Curve Flight)")
-```
