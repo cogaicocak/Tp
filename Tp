@@ -1,3 +1,4 @@
+
 -- LocalScript đặt trong StarterGui hoặc StarterPlayerScripts
 
 local TweenService = game:GetService("TweenService")
@@ -17,7 +18,8 @@ local islands = {
 }
 
 local tweenSpeed = 350
-local currentTween = nil
+local isTweening = false
+local flyHeight = 300 -- Độ cao bay (studs)
 
 -- Tạo ScreenGui
 local screenGui = Instance.new("ScreenGui")
@@ -28,8 +30,8 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- Tạo Frame chính
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 300, 0, 400)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+mainFrame.Size = UDim2.new(0, 300, 0, 450)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -225)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
@@ -58,7 +60,7 @@ titleCorner.Parent = titleLabel
 -- Tạo ScrollingFrame cho danh sách đảo
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Name = "IslandList"
-scrollFrame.Size = UDim2.new(1, -20, 1, -70)
+scrollFrame.Size = UDim2.new(1, -20, 1, -110)
 scrollFrame.Position = UDim2.new(0, 10, 0, 60)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.BorderSizePixel = 0
@@ -71,37 +73,135 @@ listLayout.Padding = UDim.new(0, 8)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = scrollFrame
 
--- Hàm tween đến đảo
+-- Hàm tween mượt với đường bay cong
 local function tweenToIsland(targetPosition)
-    -- Dừng tween hiện tại nếu có
-    if currentTween then
-        currentTween:Cancel()
+    if isTweening then
+        isTweening = false
+        wait(0.1)
     end
     
-    -- Lấy HumanoidRootPart mới nhất
+    isTweening = true
+    
+    -- Lấy character và HumanoidRootPart mới nhất
     character = player.Character
-    if not character then return end
+    if not character then 
+        isTweening = false
+        return 
+    end
+    
     humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
+    local humanoid = character:FindFirstChild("Humanoid")
     
-    -- Tính khoảng cách và thời gian
-    local distance = (targetPosition - humanoidRootPart.Position).Magnitude
-    local duration = distance / tweenSpeed
+    if not humanoidRootPart or not humanoid then 
+        isTweening = false
+        return 
+    end
     
-    -- Tạo tween
-    local tweenInfo = TweenInfo.new(
-        duration,
-        Enum.EasingStyle.Linear,
-        Enum.EasingDirection.InOut
-    )
+    -- Tắt gravity và collision để tránh giật
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = humanoidRootPart
     
-    local goal = {CFrame = CFrame.new(targetPosition)}
-    currentTween = TweenService:Create(humanoidRootPart, tweenInfo, goal)
+    local bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bodyGyro.P = 10000
+    bodyGyro.D = 500
+    bodyGyro.CFrame = humanoidRootPart.CFrame
+    bodyGyro.Parent = humanoidRootPart
     
-    -- Chạy tween
-    currentTween:Play()
+    -- Vô hiệu hóa collision
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
     
-    print("Đang bay đến đảo... (" .. math.floor(distance) .. " studs)")
+    -- Tính toán 3 điểm: Start -> Peak (cao) -> End
+    local startPos = humanoidRootPart.Position
+    local endPos = targetPosition
+    
+    -- Tính điểm cao nhất (peak) ở giữa hành trình
+    local midPoint = (startPos + endPos) / 2
+    local peakPos = Vector3.new(midPoint.X, math.max(startPos.Y, endPos.Y) + flyHeight, midPoint.Z)
+    
+    -- Tính tổng quãng đường (bay theo đường cong)
+    local dist1 = (peakPos - startPos).Magnitude
+    local dist2 = (endPos - peakPos).Magnitude
+    local totalDistance = dist1 + dist2
+    local duration = totalDistance / tweenSpeed
+    
+    print("Đang bay đến đảo... (" .. math.floor(totalDistance) .. " studs, " .. math.floor(duration) .. "s)")
+    
+    -- Tween mượt bằng RunService với đường cong Bezier
+    local RunService = game:GetService("RunService")
+    local startTime = tick()
+    local connection
+    
+    connection = RunService.Heartbeat:Connect(function()
+        if not isTweening then
+            connection:Disconnect()
+            bodyVelocity:Destroy()
+            bodyGyro:Destroy()
+            -- Khôi phục collision
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.CanCollide = true
+                end
+            end
+            return
+        end
+        
+        local elapsed = tick() - startTime
+        local alpha = math.min(elapsed / duration, 1)
+        
+        -- Easing function (Sine InOut cho mượt hơn)
+        local easedAlpha = alpha < 0.5 
+            and 2 * alpha * alpha 
+            or 1 - math.pow(-2 * alpha + 2, 2) / 2
+        
+        -- Tính vị trí theo đường cong Quadratic Bezier (3 điểm)
+        -- B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+        local t = easedAlpha
+        local oneMinusT = 1 - t
+        
+        local currentPos = 
+            oneMinusT * oneMinusT * startPos +
+            2 * oneMinusT * t * peakPos +
+            t * t * endPos
+        
+        -- Tính hướng nhìn (lookAt next point)
+        local nextT = math.min(t + 0.01, 1)
+        local nextOneMinusT = 1 - nextT
+        local nextPos = 
+            nextOneMinusT * nextOneMinusT * startPos +
+            2 * nextOneMinusT * nextT * peakPos +
+            nextT * nextT * endPos
+        
+        -- Di chuyển mượt
+        local lookAtCFrame = CFrame.new(currentPos, nextPos)
+        humanoidRootPart.CFrame = lookAtCFrame
+        bodyGyro.CFrame = lookAtCFrame
+        
+        -- Kết thúc
+        if alpha >= 1 then
+            connection:Disconnect()
+            humanoidRootPart.CFrame = CFrame.new(endPos)
+            bodyVelocity:Destroy()
+            bodyGyro:Destroy()
+            
+            -- Khôi phục collision
+            task.wait(0.1)
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.CanCollide = true
+                end
+            end
+            
+            isTweening = false
+            print("Đã đến đảo!")
+        end
+    end)
 end
 
 -- Tạo button cho mỗi đảo
@@ -167,6 +267,45 @@ closeButton.MouseButton1Click:Connect(function()
     mainFrame.Visible = not mainFrame.Visible
 end)
 
+-- Nút Stop
+local stopButton = Instance.new("TextButton")
+stopButton.Name = "StopButton"
+stopButton.Size = UDim2.new(0.48, 0, 0, 35)
+stopButton.Position = UDim2.new(0, 10, 1, -45)
+stopButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+stopButton.BorderSizePixel = 0
+stopButton.Text = "⏹ STOP"
+stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopButton.Font = Enum.Font.GothamBold
+stopButton.TextSize = 14
+stopButton.Parent = mainFrame
+
+local stopCorner = Instance.new("UICorner")
+stopCorner.CornerRadius = UDim.new(0, 8)
+stopCorner.Parent = stopButton
+
+stopButton.MouseButton1Click:Connect(function()
+    isTweening = false
+    print("Đã dừng tween!")
+end)
+
+-- Label hiển thị độ cao bay
+local heightLabel = Instance.new("TextLabel")
+heightLabel.Name = "HeightLabel"
+heightLabel.Size = UDim2.new(0.48, 0, 0, 35)
+heightLabel.Position = UDim2.new(0.52, 0, 1, -45)
+heightLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+heightLabel.BorderSizePixel = 0
+heightLabel.Text = "High: " .. flyHeight
+heightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+heightLabel.Font = Enum.Font.Gotham
+heightLabel.TextSize = 14
+heightLabel.Parent = mainFrame
+
+local heightCorner = Instance.new("UICorner")
+heightCorner.CornerRadius = UDim.new(0, 8)
+heightCorner.Parent = heightLabel
+
 -- Kéo thả GUI
 local dragging = false
 local dragInput, mousePos, framePos
@@ -207,4 +346,8 @@ end)
 player.CharacterAdded:Connect(function(char)
     character = char
     humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    isTweening = false
 end)
+
+print("Island Teleport GUI đã được tải! (Smooth Curve Flight)")
+```
