@@ -1,8 +1,9 @@
--- TeleportIslands GUI Script
+-- TeleportIslands GUI Script (FIXED - Bay mượt không giật)
 -- Đặt script này vào StarterGui hoặc StarterPlayerScripts
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
@@ -88,8 +89,10 @@ listLayout.Parent = scrollFrame
 -- Biến để kiểm soát tween
 local currentTween = nil
 local isTweening = false
+local bodyVelocity = nil
+local bodyGyro = nil
 
--- Hàm tween mượt mà đến đảo
+-- Hàm tween mượt mà đến đảo (FIXED - Bay thẳng không giật)
 local function teleportToIsland(targetPosition)
     if isTweening then
         warn("Đang di chuyển, vui lòng đợi!")
@@ -102,41 +105,116 @@ local function teleportToIsland(targetPosition)
     humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
     if not humanoidRootPart then return end
     
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
     isTweening = true
     
-    -- Tính khoảng cách để xác định thời gian tween
-    local distance = (targetPosition - humanoidRootPart.Position).Magnitude
-    local tweenSpeed = 350 -- Tốc độ studs/giây
+    -- TẮT COLLISION VÀ GRAVITY ĐỂ BAY MƯỢT
+    -- Lưu trạng thái cũ
+    local oldCanCollide = {}
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            oldCanCollide[part] = part.CanCollide
+            part.CanCollide = false
+        end
+    end
+    
+    -- Tạo BodyVelocity để chống gravity và giữ vận tốc ổn định
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
+    bodyVelocity.Parent = humanoidRootPart
+    
+    -- Tạo BodyGyro để giữ hướng ổn định
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(100000, 100000, 100000)
+    bodyGyro.CFrame = humanoidRootPart.CFrame
+    bodyGyro.P = 10000
+    bodyGyro.D = 500
+    bodyGyro.Parent = humanoidRootPart
+    
+    -- Đặt Humanoid state để tránh animation can thiệp
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+    
+    -- Tính khoảng cách và thời gian
+    local startPos = humanoidRootPart.Position
+    local distance = (targetPosition - startPos).Magnitude
+    local tweenSpeed = 350
     local tweenTime = distance / tweenSpeed
     
-    -- Tạo TweenInfo với easing mượt mà
+    -- Tính hướng bay (LookVector)
+    local direction = (targetPosition - startPos).Unit
+    local targetCFrame = CFrame.new(startPos, startPos + direction)
+    
+    -- TẠO TWEEN CHO POSITION (Bay thẳng)
     local tweenInfo = TweenInfo.new(
         tweenTime,
-        Enum.EasingStyle.Linear, -- Linear để tốc độ đều
-        Enum.EasingDirection.Out,
+        Enum.EasingStyle.Linear,
+        Enum.EasingDirection.InOut,
         0,
         false,
         0
     )
-    
-    -- Tạo tween cho CFrame (không bị giật do xyz khác nhau)
-    local goal = {CFrame = CFrame.new(targetPosition)}
     
     -- Hủy tween cũ nếu có
     if currentTween then
         currentTween:Cancel()
     end
     
+    -- TWEEN POSITION TRỰC TIẾP thay vì CFrame để tránh rotation
+    local goal = {CFrame = CFrame.new(targetPosition) * CFrame.Angles(0, humanoidRootPart.CFrame.Rotation.Y, 0)}
     currentTween = TweenService:Create(humanoidRootPart, tweenInfo, goal)
+    
+    -- Cập nhật BodyGyro trong suốt quá trình bay để giữ hướng
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if bodyGyro and bodyGyro.Parent then
+            -- Giữ hướng nhìn về phía đích
+            local currentDirection = (targetPosition - humanoidRootPart.Position).Unit
+            bodyGyro.CFrame = CFrame.new(humanoidRootPart.Position, humanoidRootPart.Position + currentDirection)
+        end
+    end)
     
     -- Xử lý khi tween hoàn thành
     currentTween.Completed:Connect(function(playbackState)
         isTweening = false
+        
+        -- Ngắt kết nối RenderStepped
+        if connection then
+            connection:Disconnect()
+        end
+        
+        -- Xóa BodyVelocity và BodyGyro
+        if bodyVelocity then
+            bodyVelocity:Destroy()
+            bodyVelocity = nil
+        end
+        if bodyGyro then
+            bodyGyro:Destroy()
+            bodyGyro = nil
+        end
+        
+        -- Khôi phục collision
+        for part, canCollide in pairs(oldCanCollide) do
+            if part and part.Parent then
+                part.CanCollide = canCollide
+            end
+        end
+        
+        -- Khôi phục Humanoid state
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+        humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+        
         currentTween = nil
-        print("Đã đến đảo!")
+        print("✅ Đã đến đảo!")
     end)
     
     currentTween:Play()
+    print("✈️ Đang bay đến đảo...")
 end
 
 -- Tạo button cho mỗi đảo
@@ -231,10 +309,20 @@ player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = character:WaitForChild("HumanoidRootPart")
     isTweening = false
+    
+    -- Dọn dẹp nếu đang tween
     if currentTween then
         currentTween:Cancel()
         currentTween = nil
     end
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
 end)
 
-print("Island Teleporter GUI đã load thành công!")
+print("✅ Island Teleporter GUI đã load thành công! (FIXED - Bay mượt)")
