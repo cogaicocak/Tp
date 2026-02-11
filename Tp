@@ -1,0 +1,210 @@
+-- LocalScript đặt trong StarterGui hoặc StarterPlayerScripts
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Danh sách các đảo
+local islands = {
+    {name = "Peanut Island", position = Vector3.new(-2158.17, 38.36, -10193.24)},
+    {name = "Icecream Island", position = Vector3.new(-863.93, 66.08, -11019.04)},
+    {name = "Tiki", position = Vector3.new(-16228.08, 9.32, 412.53)},
+    {name = "Haunted Castle", position = Vector3.new(-9506.11, 142.36, 5526.04)},
+    {name = "CakeLoaf", position = Vector3.new(-2145.42, 38.06, -11895.08)},
+    {name = "Castle On The Sea", position = Vector3.new(-4999.45, 314.78, -3010.54)}
+}
+
+local tweenSpeed = 350
+local currentTween = nil
+
+-- Tạo ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "IslandTeleportGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Tạo Frame chính
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 300, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+-- Bo góc cho frame
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+-- Tạo tiêu đề
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "Title"
+titleLabel.Size = UDim2.new(1, 0, 0, 50)
+titleLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleLabel.BorderSizePixel = 0
+titleLabel.Text = "🏝️ Island Teleport"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20
+titleLabel.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = titleLabel
+
+-- Tạo ScrollingFrame cho danh sách đảo
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Name = "IslandList"
+scrollFrame.Size = UDim2.new(1, -20, 1, -70)
+scrollFrame.Position = UDim2.new(0, 10, 0, 60)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.BorderSizePixel = 0
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.Parent = mainFrame
+
+-- Layout cho các button
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 8)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = scrollFrame
+
+-- Hàm tween đến đảo
+local function tweenToIsland(targetPosition)
+    -- Dừng tween hiện tại nếu có
+    if currentTween then
+        currentTween:Cancel()
+    end
+    
+    -- Lấy HumanoidRootPart mới nhất
+    character = player.Character
+    if not character then return end
+    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    -- Tính khoảng cách và thời gian
+    local distance = (targetPosition - humanoidRootPart.Position).Magnitude
+    local duration = distance / tweenSpeed
+    
+    -- Tạo tween
+    local tweenInfo = TweenInfo.new(
+        duration,
+        Enum.EasingStyle.Linear,
+        Enum.EasingDirection.InOut
+    )
+    
+    local goal = {CFrame = CFrame.new(targetPosition)}
+    currentTween = TweenService:Create(humanoidRootPart, tweenInfo, goal)
+    
+    -- Chạy tween
+    currentTween:Play()
+    
+    print("Đang bay đến đảo... (" .. math.floor(distance) .. " studs)")
+end
+
+-- Tạo button cho mỗi đảo
+for i, island in ipairs(islands) do
+    local button = Instance.new("TextButton")
+    button.Name = island.name
+    button.Size = UDim2.new(1, -10, 0, 45)
+    button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    button.BorderSizePixel = 0
+    button.Text = island.name
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 16
+    button.AutoButtonColor = false
+    button.Parent = scrollFrame
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.Parent = button
+    
+    -- Hiệu ứng hover
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end)
+    
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    end)
+    
+    -- Click để tween
+    button.MouseButton1Click:Connect(function()
+        tweenToIsland(island.position)
+        button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        wait(0.2)
+        button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    end)
+end
+
+-- Cập nhật canvas size
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- Tạo nút đóng
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 10)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+closeButton.BorderSizePixel = 0
+closeButton.Text = "✕"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 18
+closeButton.Parent = mainFrame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(1, 0)
+closeCorner.Parent = closeButton
+
+closeButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- Kéo thả GUI
+local dragging = false
+local dragInput, mousePos, framePos
+
+titleLabel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        mousePos = input.Position
+        framePos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleLabel.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - mousePos
+        mainFrame.Position = UDim2.new(
+            framePos.X.Scale,
+            framePos.X.Offset + delta.X,
+            framePos.Y.Scale,
+            framePos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Cập nhật character khi respawn
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+end)
