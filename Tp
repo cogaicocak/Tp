@@ -1,8 +1,9 @@
--- Smart Island Teleporter (Multi-hop with instant TP)
+-- Smart Island Teleporter (Instant TP during reset - NO WAIT)
 -- Đặt script này vào StarterGui hoặc StarterPlayerScripts
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 -- Danh sách các đảo với emoji
@@ -18,7 +19,7 @@ local islands = {
     {name = "Mansion", position = Vector3.new(-12507.32, 337.17, -7470.36), emoji = "🏛️"}
 }
 
--- Khoảng cách tối đa để TP trực tiếp (không cần đảo trung gian)
+-- Khoảng cách tối đa để TP trực tiếp
 local MAX_DIRECT_TP_DISTANCE = 8000
 
 -- Tạo GUI
@@ -78,7 +79,7 @@ local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 8)
 closeCorner.Parent = closeButton
 
--- Status Label (hiển thị tiến trình)
+-- Status Label
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Name = "StatusLabel"
 statusLabel.Size = UDim2.new(1, -20, 0, 30)
@@ -114,6 +115,7 @@ listLayout.Parent = scrollFrame
 
 -- Biến kiểm soát
 local isTeleporting = false
+local pendingTeleportPosition = nil
 
 -- Hàm tìm đảo trung gian gần nhất
 local function findIntermediateIsland(startPos, targetPos, excludeIslands)
@@ -121,7 +123,6 @@ local function findIntermediateIsland(startPos, targetPos, excludeIslands)
     local bestIsland = nil
     
     for _, island in ipairs(islands) do
-        -- Bỏ qua các đảo đã loại trừ
         local skip = false
         for _, excluded in ipairs(excludeIslands) do
             if island.name == excluded then
@@ -134,7 +135,6 @@ local function findIntermediateIsland(startPos, targetPos, excludeIslands)
             local distanceFromStart = (island.position - startPos).Magnitude
             local distanceToTarget = (island.position - targetPos).Magnitude
             
-            -- Đảo trung gian phải gần đích hơn điểm xuất phát
             if distanceToTarget < (targetPos - startPos).Magnitude then
                 local totalDistance = distanceFromStart + distanceToTarget
                 if totalDistance < minDistance then
@@ -155,17 +155,70 @@ local function updateStatus(text, color)
     statusLabel.Visible = true
 end
 
--- Hàm instant teleport
-local function instantTeleport(position)
+-- Hàm instant TP NGAY KHI RESET (không đợi respawn)
+local function instantTeleportOnReset(position)
+    pendingTeleportPosition = position
+    
     local character = player.Character
-    if not character then return false end
+    if not character then return end
     
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return false end
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
     
-    -- Instant TP ngay lập tức
-    humanoidRootPart.CFrame = CFrame.new(position)
-    return true
+    -- Kết nối sự kiện để TP NGAY khi character mới được tạo (trước khi respawn hoàn tất)
+    local connection
+    connection = player.CharacterAdded:Connect(function(newChar)
+        -- TP NGAY LẬP TỨC khi character vừa được add
+        local hrp = newChar:WaitForChild("HumanoidRootPart")
+        
+        -- INSTANT TP ngay lập tức, không đợi
+        hrp.CFrame = CFrame.new(pendingTeleportPosition)
+        
+        -- Ngắt kết nối sau khi TP
+        connection:Disconnect()
+        pendingTeleportPosition = nil
+    end)
+    
+    -- Reset nhân vật
+    humanoid.Health = 0
+end
+
+-- Hàm TP với đợi respawn hoàn tất (cho intermediate hops)
+local function teleportAndWait(position)
+    return coroutine.wrap(function()
+        local character = player.Character
+        if not character then return false end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not humanoid then return false end
+        
+        local completed = false
+        
+        -- Kết nối để TP ngay khi character được tạo
+        local connection
+        connection = player.CharacterAdded:Connect(function(newChar)
+            local hrp = newChar:WaitForChild("HumanoidRootPart")
+            
+            -- INSTANT TP ngay lập tức
+            hrp.CFrame = CFrame.new(position)
+            
+            -- Đợi respawn hoàn tất
+            task.wait(1)
+            
+            completed = true
+            connection:Disconnect()
+        end)
+        
+        -- Reset
+        humanoid.Health = 0
+        
+        -- Đợi cho đến khi hoàn tất
+        while not completed do
+            task.wait()
+        end
+        
+        return true
+    end)()
 end
 
 -- Hàm chính teleport với multi-hop
@@ -198,19 +251,12 @@ local function smartTeleport(targetIsland)
     
     -- Nếu khoảng cách ngắn, TP trực tiếp
     if distance <= MAX_DIRECT_TP_DISTANCE then
-        updateStatus("🚀 Teleporting to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
+        updateStatus("⚡ Instant TP to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
         
-        -- Reset và instant TP
-        character:FindFirstChild("Humanoid").Health = 0
+        -- INSTANT TP ngay khi reset (không đợi respawn)
+        instantTeleportOnReset(targetPos)
         
-        -- Đợi respawn
-        local newChar = player.CharacterAdded:Wait()
-        local newHRP = newChar:WaitForChild("HumanoidRootPart")
-        
-        -- Instant TP ngay khi respawn
-        task.wait(0.1)
-        instantTeleport(targetPos)
-        
+        task.wait(2)
         updateStatus("✅ Arrived at " .. targetIsland.name, Color3.fromRGB(150, 255, 150))
         task.wait(2)
         statusLabel.Visible = false
@@ -237,40 +283,21 @@ local function smartTeleport(targetIsland)
             end
         end
         
-        -- Thực hiện teleport qua các điểm
+        -- Thực hiện teleport qua các điểm trung gian
         for i, hopIsland in ipairs(hops) do
-            updateStatus(string.format("🚀 Hop %d/%d: %s", i, #hops, hopIsland.name), Color3.fromRGB(255, 200, 100))
+            updateStatus(string.format("⚡ Hop %d/%d: %s", i, #hops, hopIsland.name), Color3.fromRGB(255, 200, 100))
             
-            -- Reset nhân vật
-            character:FindFirstChild("Humanoid").Health = 0
-            
-            -- Đợi respawn
-            local newChar = player.CharacterAdded:Wait()
-            local newHRP = newChar:WaitForChild("HumanoidRootPart")
-            
-            -- Instant TP ngay khi respawn
-            task.wait(0.1)
-            instantTeleport(hopIsland.position)
-            
-            -- Đợi respawn hoàn tất trước khi tiếp tục
-            task.wait(1)
-            character = newChar
+            -- TP và đợi respawn hoàn tất trước khi tiếp tục hop tiếp theo
+            teleportAndWait(hopIsland.position)
         end
         
-        -- TP đến đích cuối cùng
-        updateStatus("🎯 Final hop to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
+        -- TP đến đích cuối cùng (INSTANT, không đợi respawn)
+        updateStatus("⚡ Final instant TP to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
         
-        -- Reset lần cuối
-        character:FindFirstChild("Humanoid").Health = 0
+        -- INSTANT TP đến đích (không đợi)
+        instantTeleportOnReset(targetPos)
         
-        -- Đợi respawn
-        local finalChar = player.CharacterAdded:Wait()
-        local finalHRP = finalChar:WaitForChild("HumanoidRootPart")
-        
-        -- Instant TP đến đích
-        task.wait(0.1)
-        instantTeleport(targetPos)
-        
+        task.wait(2)
         updateStatus("✅ Arrived at " .. targetIsland.name .. " (" .. (#hops + 1) .. " hops)", Color3.fromRGB(150, 255, 150))
         task.wait(3)
         statusLabel.Visible = false
@@ -391,4 +418,4 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
-print("✅ Smart Island Teleporter đã load! (Multi-hop support)")
+print("✅ Smart Island Teleporter đã load! (INSTANT TP - NO WAIT)")
