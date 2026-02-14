@@ -1,8 +1,9 @@
--- Smart Island Teleporter (Head stays, body parts instant TP)
+-- Smart Island Teleporter (SPAM TP to bypass anti-cheat)
 -- Đặt script này vào StarterGui hoặc StarterPlayerScripts
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 -- Danh sách các đảo với emoji
@@ -18,7 +19,9 @@ local islands = {
     {name = "Mansion", position = Vector3.new(-12507.32, 337.17, -7470.36), emoji = "🏛️"}
 }
 
--- Khoảng cách tối đa để TP trực tiếp
+-- Cài đặt spam TP
+local SPAM_TP_COUNT = 50 -- Số lần spam TP
+local SPAM_TP_INTERVAL = 0.01 -- Delay giữa mỗi lần TP (càng nhỏ càng tốt)
 local MAX_DIRECT_TP_DISTANCE = 8000
 
 -- Tạo GUI
@@ -153,8 +156,8 @@ local function updateStatus(text, color)
     statusLabel.Visible = true
 end
 
--- HÀM INSTANT TP (Head ở lại, body parts bay đi)
-local function headStaysBodyTP(position)
+-- HÀM SPAM TP (TP liên tục nhiều lần để bypass anti-cheat)
+local function spamTeleport(position)
     local character = player.Character
     if not character then return false end
     
@@ -162,37 +165,64 @@ local function headStaysBodyTP(position)
     local hrp = character:FindFirstChild("HumanoidRootPart")
     local head = character:FindFirstChild("Head")
     
-    if not humanoid or not hrp or not head then return false end
+    if not humanoid or not hrp then return false end
     
-    -- Tách Head ra khỏi character tạm thời (để Head không bị TP theo)
-    local headWeld = head:FindFirstChild("Neck")
-    if headWeld then
-        headWeld:Destroy()
-    end
-    
-    -- TP TẤT CẢ CÁC BODY PARTS trừ HEAD
-    for _, part in pairs(character:GetChildren()) do
-        if part:IsA("BasePart") and part.Name ~= "Head" then
-            part.CFrame = CFrame.new(position) * CFrame.new(
-                math.random(-2, 2),
-                math.random(-1, 1),
-                math.random(-2, 2)
-            )
+    -- Tách Head ra (Head stays, body TP)
+    if head then
+        local headWeld = head:FindFirstChild("Neck")
+        if headWeld then
+            headWeld:Destroy()
         end
     end
     
-    -- TP HumanoidRootPart đến vị trí chính xác
-    hrp.CFrame = CFrame.new(position)
+    -- SPAM TP tất cả body parts (trừ Head) nhiều lần
+    local spamConnection
+    local spamCount = 0
     
-    -- Reset để respawn (Head sẽ rơi xuống, body đã ở đích)
-    task.wait(0.05)
-    humanoid.Health = 0
+    spamConnection = RunService.Heartbeat:Connect(function()
+        if spamCount >= SPAM_TP_COUNT then
+            spamConnection:Disconnect()
+            return
+        end
+        
+        -- Kiểm tra character vẫn tồn tại
+        if not character or not character.Parent then
+            spamConnection:Disconnect()
+            return
+        end
+        
+        -- TP tất cả body parts
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "Head" then
+                part.CFrame = CFrame.new(position)
+                part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+        
+        -- TP HumanoidRootPart chính xác
+        if hrp and hrp.Parent then
+            hrp.CFrame = CFrame.new(position)
+            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end
+        
+        spamCount = spamCount + 1
+    end)
+    
+    -- Đợi spam TP hoàn tất
+    task.wait(SPAM_TP_COUNT * SPAM_TP_INTERVAL + 0.2)
+    
+    -- Reset sau khi spam TP xong
+    if humanoid and humanoid.Parent then
+        humanoid.Health = 0
+    end
     
     return true
 end
 
--- HÀM TP VỚI ĐỢI RESPAWN (cho intermediate hops)
-local function teleportWithWait(position)
+-- HÀM SPAM TP VỚI ĐỢI RESPAWN (cho intermediate hops)
+local function spamTeleportWithWait(position)
     local character = player.Character
     if not character then return false end
     
@@ -210,22 +240,45 @@ local function teleportWithWait(position)
         end
     end
     
-    -- TP body parts
-    for _, part in pairs(character:GetChildren()) do
-        if part:IsA("BasePart") and part.Name ~= "Head" then
-            part.CFrame = CFrame.new(position) * CFrame.new(
-                math.random(-2, 2),
-                math.random(-1, 1),
-                math.random(-2, 2)
-            )
-        end
-    end
+    -- SPAM TP
+    local spamConnection
+    local spamCount = 0
     
-    hrp.CFrame = CFrame.new(position)
+    spamConnection = RunService.Heartbeat:Connect(function()
+        if spamCount >= SPAM_TP_COUNT then
+            spamConnection:Disconnect()
+            return
+        end
+        
+        if not character or not character.Parent then
+            spamConnection:Disconnect()
+            return
+        end
+        
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "Head" then
+                part.CFrame = CFrame.new(position)
+                part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+        
+        if hrp and hrp.Parent then
+            hrp.CFrame = CFrame.new(position)
+            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end
+        
+        spamCount = spamCount + 1
+    end)
+    
+    -- Đợi spam hoàn tất
+    task.wait(SPAM_TP_COUNT * SPAM_TP_INTERVAL + 0.2)
     
     -- Reset
-    task.wait(0.05)
-    humanoid.Health = 0
+    if humanoid and humanoid.Parent then
+        humanoid.Health = 0
+    end
     
     -- Đợi respawn
     local newChar = player.CharacterAdded:Wait()
@@ -265,10 +318,10 @@ local function smartTeleport(targetIsland)
     
     -- Nếu khoảng cách ngắn, TP trực tiếp
     if distance <= MAX_DIRECT_TP_DISTANCE then
-        updateStatus("⚡ Instant TP to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
+        updateStatus("⚡ Spam TP to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
         
-        -- Head stays, body TP
-        headStaysBodyTP(targetPos)
+        -- SPAM TP
+        spamTeleport(targetPos)
         
         task.wait(2)
         updateStatus("✅ Arrived at " .. targetIsland.name, Color3.fromRGB(150, 255, 150))
@@ -299,17 +352,17 @@ local function smartTeleport(targetIsland)
         
         -- Thực hiện teleport qua các điểm trung gian
         for i, hopIsland in ipairs(hops) do
-            updateStatus(string.format("⚡ Hop %d/%d: %s", i, #hops, hopIsland.name), Color3.fromRGB(255, 200, 100))
+            updateStatus(string.format("⚡ Spam TP %d/%d: %s", i, #hops, hopIsland.name), Color3.fromRGB(255, 200, 100))
             
-            -- TP và đợi respawn
-            teleportWithWait(hopIsland.position)
+            -- SPAM TP và đợi respawn
+            spamTeleportWithWait(hopIsland.position)
         end
         
         -- TP đến đích cuối cùng
-        updateStatus("⚡ Final instant TP to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
+        updateStatus("⚡ Final spam TP to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
         
-        -- Head stays, body TP
-        headStaysBodyTP(targetPos)
+        -- SPAM TP đến đích
+        spamTeleport(targetPos)
         
         task.wait(2)
         updateStatus("✅ Arrived at " .. targetIsland.name .. " (" .. (#hops + 1) .. " hops)", Color3.fromRGB(150, 255, 150))
@@ -432,4 +485,4 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
-print("✅ Smart Island Teleporter đã load! (Head stays, body instant TP)")
+print("✅ Smart Island Teleporter đã load! (SPAM TP - Anti-cheat bypass)")
