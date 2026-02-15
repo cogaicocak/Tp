@@ -1,7 +1,4 @@
 
--- Smart Island Teleporter (RESET TRƯỚC - TP TRONG LÚC RESET)
--- Đặt script này vào StarterGui hoặc StarterPlayerScripts
-
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -156,28 +153,56 @@ local function updateStatus(text, color)
     statusLabel.Visible = true
 end
 
--- HÀM RESET TRƯỚC RỒI SPAM TP (ĐÚNG CÁCH)
-local function resetFirstThenSpamTP(position)
+-- HÀM RESET TRƯỚC (HEAD Ở LẠI) - SAU ĐÓ SPAM TP BODY
+local function resetThenSpamTPBody(position)
     local character = player.Character
     if not character then return false end
     
     local humanoid = character:FindFirstChild("Humanoid")
+    local head = character:FindFirstChild("Head")
+    
     if not humanoid then return false end
     
-    -- LƯU LẠI VỊ TRÍ CẦN TP
-    local targetPos = position
+    print("💀 BƯỚC 1: Tách đầu khỏi body...")
     
-    -- BƯỚC 1: BẮT ĐẦU SPAM TP THREAD (nhưng chưa chạy)
+    -- BƯỚC 1: TÁCH ĐẦU RA TRƯỚC KHI RESET (để đầu ở lại)
+    if head then
+        local neck = head:FindFirstChild("Neck")
+        if neck then
+            neck:Destroy()
+        end
+        -- Break tất cả welds liên quan đến head
+        for _, weld in pairs(head:GetChildren()) do
+            if weld:IsA("Weld") or weld:IsA("Motor6D") then
+                weld:Destroy()
+            end
+        end
+    end
+    
+    task.wait(0.05) -- Đợi 1 chút để đầu tách hoàn toàn
+    
+    print("💀 BƯỚC 2: RESET character...")
+    
+    -- BƯỚC 2: RESET CHARACTER (đầu đã tách nên sẽ ở lại)
+    humanoid.Health = 0
+    
+    task.wait(0.1) -- Đợi reset bắt đầu
+    
+    print("⚡ BƯỚC 3: BẮT ĐẦU SPAM TP BODY PARTS (trừ head)...")
+    
+    -- BƯỚC 3: SAU KHI ĐÃ RESET, BẮT ĐẦU SPAM TP CÁC BODY PARTS
+    local targetPos = position
     local spamActive = true
     local connections = {}
+    local startTime = tick()
     
-    -- Hàm spam TP tất cả parts
-    local function spamTPAllParts()
+    -- Hàm spam TP tất cả parts TRỪ HEAD
+    local function spamTPBodyOnly()
         local char = player.Character
         if not char then return end
         
         for _, part in pairs(char:GetChildren()) do
-            if part:IsA("BasePart") then
+            if part:IsA("BasePart") and part.Name ~= "Head" then
                 pcall(function()
                     part.CFrame = CFrame.new(targetPos)
                     part.Velocity = Vector3.new(0, 0, 0)
@@ -188,6 +213,7 @@ local function resetFirstThenSpamTP(position)
             end
         end
         
+        -- TP HRP chính xác nhất (KHÔNG BAO GỒM HEAD)
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if hrp then
             pcall(function()
@@ -200,15 +226,12 @@ local function resetFirstThenSpamTP(position)
         end
     end
     
-    -- BƯỚC 2: BẮT ĐẦU SPAM TP THREADS
-    local startTime = tick()
-    
     -- Thread 1: Heartbeat
     local heartbeatConn = RunService.Heartbeat:Connect(function()
         if not spamActive or tick() - startTime > SPAM_DURATION then
             return
         end
-        spamTPAllParts()
+        spamTPBodyOnly()
     end)
     table.insert(connections, heartbeatConn)
     
@@ -217,7 +240,7 @@ local function resetFirstThenSpamTP(position)
         if not spamActive or tick() - startTime > SPAM_DURATION then
             return
         end
-        spamTPAllParts()
+        spamTPBodyOnly()
     end)
     table.insert(connections, renderConn)
     
@@ -226,14 +249,14 @@ local function resetFirstThenSpamTP(position)
         if not spamActive or tick() - startTime > SPAM_DURATION then
             return
         end
-        spamTPAllParts()
+        spamTPBodyOnly()
     end)
     table.insert(connections, steppedConn)
     
     -- Thread 4: Task spam
     task.spawn(function()
         while spamActive and tick() - startTime < SPAM_DURATION do
-            spamTPAllParts()
+            spamTPBodyOnly()
             task.wait()
         end
     end)
@@ -241,28 +264,23 @@ local function resetFirstThenSpamTP(position)
     -- Thread 5: Task spam 2
     task.spawn(function()
         while spamActive and tick() - startTime < SPAM_DURATION do
-            spamTPAllParts()
+            spamTPBodyOnly()
             RunService.Heartbeat:Wait()
         end
     end)
     
-    -- BƯỚC 3: RESET NGAY SAU KHI ĐÃ BẮT ĐẦU SPAM
-    task.wait(0.05) -- Đợi 1 chút để spam threads bắt đầu
-    humanoid.Health = 0
-    print("💀 Đã reset character - spam TP đang chạy...")
+    print("⏳ BƯỚC 4: Đợi respawn trong lúc spam TP...")
     
-    -- BƯỚC 4: ĐỢI RESPAWN và tiếp tục spam
-    player.CharacterAdded:Wait()
-    print("✅ Character respawned - vẫn đang spam TP...")
+    -- BƯỚC 4: ĐỢI RESPAWN (trong lúc spam vẫn chạy)
+    local newChar = player.CharacterAdded:Wait()
+    newChar:WaitForChild("HumanoidRootPart")
     
-    -- Đợi HRP
-    local newChar = player.Character
-    if newChar then
-        newChar:WaitForChild("HumanoidRootPart")
-    end
+    print("✅ Character respawned - tiếp tục spam thêm chút...")
     
-    -- Tiếp tục spam thêm chút
+    -- Tiếp tục spam thêm một chút sau respawn
     task.wait(0.5)
+    
+    print("🛑 BƯỚC 5: Dừng spam TP")
     
     -- BƯỚC 5: DỪNG SPAM
     spamActive = false
@@ -272,14 +290,12 @@ local function resetFirstThenSpamTP(position)
         end
     end
     
-    print("🛑 Dừng spam TP")
-    
     return true
 end
 
 -- HÀM RESET VÀ SPAM TP VỚI ĐỢI (cho intermediate hops)
 local function resetSpamTPWithWait(position)
-    resetFirstThenSpamTP(position)
+    resetThenSpamTPBody(position)
     task.wait(0.5) -- Đợi ổn định
     return true
 end
@@ -314,10 +330,10 @@ local function smartTeleport(targetIsland)
     
     -- Nếu khoảng cách ngắn, TP trực tiếp
     if distance <= MAX_DIRECT_TP_DISTANCE then
-        updateStatus("💀 Resetting & spam TP to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
+        updateStatus("💀 Reset → ⚡ Spam TP to " .. targetIsland.name, Color3.fromRGB(100, 200, 255))
         
-        -- RESET TRƯỚC RỒI SPAM TP
-        resetFirstThenSpamTP(targetPos)
+        -- RESET TRƯỚC - HEAD Ở LẠI - SPAM TP BODY
+        resetThenSpamTPBody(targetPos)
         
         task.wait(1)
         updateStatus("✅ Arrived at " .. targetIsland.name, Color3.fromRGB(150, 255, 150))
@@ -348,17 +364,17 @@ local function smartTeleport(targetIsland)
         
         -- Thực hiện teleport qua các điểm trung gian
         for i, hopIsland in ipairs(hops) do
-            updateStatus(string.format("💀 Reset & spam %d/%d: %s", i, #hops, hopIsland.name), Color3.fromRGB(255, 200, 100))
+            updateStatus(string.format("💀 Hop %d/%d: %s", i, #hops, hopIsland.name), Color3.fromRGB(255, 200, 100))
             
-            -- RESET TRƯỚC RỒI SPAM TP
+            -- RESET - HEAD Ở LẠI - SPAM TP BODY
             resetSpamTPWithWait(hopIsland.position)
         end
         
         -- TP đến đích cuối cùng
-        updateStatus("💀 Final reset & spam to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
+        updateStatus("💀 Final hop to " .. targetIsland.name .. "...", Color3.fromRGB(100, 200, 255))
         
-        -- RESET TRƯỚC RỒI SPAM TP đến đích
-        resetFirstThenSpamTP(targetPos)
+        -- RESET - HEAD Ở LẠI - SPAM TP BODY đến đích
+        resetThenSpamTPBody(targetPos)
         
         task.wait(1)
         updateStatus("✅ Arrived at " .. targetIsland.name .. " (" .. (#hops + 1) .. " hops)", Color3.fromRGB(150, 255, 150))
@@ -481,4 +497,4 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
-print("✅ Smart Island Teleporter đã load! (RESET FIRST - SPAM DURING RESET)")
+print("✅ Smart Island Teleporter đã load! (RESET FIRST → HEAD STAYS → BODY TP)")
